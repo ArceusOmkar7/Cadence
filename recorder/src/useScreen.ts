@@ -68,7 +68,10 @@ export class UseScreen {
   private energy = 0;
   private nodes: { answer?: HTMLElement; tape?: HTMLElement; tally?: HTMLElement; status?: HTMLElement; meter?: HTMLElement; drill?: HTMLElement } = {};
 
-  constructor(private readonly d: UseDeps) { void this.init(); this.build(); }
+  constructor(private readonly d: UseDeps) {
+    if (/[?&]debug/.test(location.search)) (window as unknown as { __hand?: HandView }).__hand = d.hand; // lets a screenshot script pose the model
+    void this.init(); this.build();
+  }
 
   private async init(): Promise<void> {
     try {

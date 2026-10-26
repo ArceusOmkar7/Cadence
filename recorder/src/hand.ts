@@ -75,26 +75,49 @@ export function buildHand(): HandModel {
   return { root, model, fingers, thumbRoot, thumb, press };
 }
 
-/** A shakehand table-tennis paddle in hand coordinates: handle along the palm, blade beyond the fingers, face normal along x. */
-export const PADDLE_TIP = new THREE.Vector3(0, -0.032, -0.215);
+/**
+ * A shakehand table-tennis paddle in its own frame: the handle's centre is the origin, the handle runs along z, the blade lies towards -z,
+ * the faces point along +x (red, forehand) and -x (black, backhand).
+ */
 export function buildPaddle(): THREE.Group {
   const g = new THREE.Group();
   const wood = new THREE.MeshPhysicalMaterial({ color: 0xcf9f66, roughness: 0.5, clearcoat: 0.3 });
   const red = new THREE.MeshPhysicalMaterial({ color: 0xc8232c, roughness: 0.62, clearcoat: 0.25 });
   const black = new THREE.MeshPhysicalMaterial({ color: 0x17191d, roughness: 0.66, clearcoat: 0.25 });
   const blade = (depth: number, rx: number, ry: number) => { const s = new THREE.Shape(); s.absellipse(0, 0, rx, ry, 0, Math.PI * 2, false, 0); const e = new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false, curveSegments: 40 }); e.rotateY(Math.PI / 2); e.translate(-depth / 2, 0, 0); return e; };
-  const cy = -0.032, cz = -0.137;
-  const core = new THREE.Mesh(blade(0.0062, 0.079, 0.074), wood); core.position.set(0, cy, cz); g.add(core);
-  const fh = new THREE.Mesh(blade(0.0021, 0.0775, 0.0725), red); fh.position.set(0.0041, cy, cz); g.add(fh);
-  const bh = new THREE.Mesh(blade(0.0021, 0.0775, 0.0725), black); bh.position.set(-0.0041, cy, cz); g.add(bh);
-  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.0118, 0.0135, 0.108, 20), wood); handle.rotation.x = Math.PI / 2; handle.position.set(0, cy, -0.002); g.add(handle);
-  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.0158, 0.0158, 0.008, 20), wood); cap.rotation.x = Math.PI / 2; cap.position.set(0, cy, 0.056); g.add(cap);
+  const cz = -PADDLE_BLADE_Z;
+  const core = new THREE.Mesh(blade(0.0062, 0.079, 0.074), wood); core.position.set(0, 0, cz); g.add(core);
+  const fh = new THREE.Mesh(blade(0.0021, 0.0775, 0.0725), red); fh.position.set(0.0041, 0, cz); g.add(fh);
+  const bh = new THREE.Mesh(blade(0.0021, 0.0775, 0.0725), black); bh.position.set(-0.0041, 0, cz); g.add(bh);
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.0118, 0.0135, 0.108, 20), wood); handle.rotation.x = Math.PI / 2; g.add(handle);
+  const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.0158, 0.0158, 0.008, 20), wood); cap.rotation.x = Math.PI / 2; cap.position.set(0, 0, 0.058); g.add(cap);
   g.traverse((o) => { if ((o as THREE.Mesh).isMesh) o.castShadow = true; });
   return g;
 }
+const PADDLE_BLADE_Z = 0.135; // handle centre to blade centre
 
-/** The paddle blade's centre in hand coordinates: where the ball is met. */
-export const PADDLE_CENTER = new THREE.Vector3(0, -0.032, -0.137);
+/**
+ * The handshake (shakehand) grip, in hand coordinates (palm faces -y, fingers point -z, thumb +x on this left-hand model): the handle lies across
+ * the palm on the diagonal, the fingers wrap it, the blade stands out beyond the thumb and index finger, and its faces are parallel to the palm:
+ * the red forehand face on the palm side (the thumb rests on it), the black backhand face behind (the index finger lies against it).
+ */
+const GRIP_AXIS = new THREE.Vector3(0.8, 0, -0.6); // from the handle towards the blade tip
+export const PADDLE_HAND_POS = new THREE.Vector3(0, -0.032, 0);
+const PADDLE_HAND_Q = (() => { // paddle frame -> hand frame: -z (blade) -> GRIP_AXIS, +x (red face) -> +y (palm side)
+  const zb = GRIP_AXIS.clone().negate(), xb = new THREE.Vector3(0, 1, 0), yb = new THREE.Vector3().crossVectors(zb, xb);
+  return new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(xb, yb, zb));
+})();
+/** the blade's centre and its far tip in hand coordinates */
+export const PADDLE_CENTER = PADDLE_HAND_POS.clone().addScaledVector(GRIP_AXIS, PADDLE_BLADE_Z);
+export const PADDLE_TIP = PADDLE_CENTER.clone().addScaledVector(GRIP_AXIS, 0.075);
+export function attachPaddle(model: THREE.Object3D, paddle: THREE.Object3D): void { paddle.position.copy(PADDLE_HAND_POS); paddle.quaternion.copy(PADDLE_HAND_Q); model.add(paddle); }
+/** where the hand frame must be turned so the blade stands up and the red face looks along -z (at the opponent); mirrored = a right hand */
+export function readyQuat(mirrored: boolean): THREE.Quaternion {
+  const a = GRIP_AXIS.clone(); if (mirrored) a.x = -a.x;
+  const up = new THREE.Vector3(0, 1, 0), e2 = up, e3 = new THREE.Vector3().crossVectors(a, e2);
+  const H = new THREE.Matrix4().makeBasis(a, e2, e3), W = new THREE.Matrix4().makeBasis(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, -1), new THREE.Vector3(-1, 0, 0));
+  return new THREE.Quaternion().setFromRotationMatrix(W.multiply(H.transpose()));
+}
 
 /** Bends the model's fingers to the given curls (thumb..little, 0..1). */
 export function applyCurl(h: HandModel, curl: number[]): void {
@@ -116,7 +139,7 @@ export function fingerAngles(finger: number, c: number): number[] {
 }
 
 const TRAIL = 36;
-export const GRIP = [0.42, 0.55, 0.72, 0.8, 0.82];
+export const GRIP = [0.12, 0.56, 0.78, 0.84, 0.86]; // thumb lies along the face, the other fingers wrap the handle
 export type ViewName = 'back' | 'palm' | 'side';
 const VIEWS: Record<ViewName, [number, number, number]> = { back: [0.1, 0.3, 0.34], palm: [0.1, -0.3, 0.34], side: [0.42, 0.04, 0.02] };
 const PLAY_VIEWS: Record<ViewName, [number, number, number]> = { back: [0.36, 0.3, 0.44], palm: [0.36, -0.24, 0.44], side: [0.62, 0.06, 0.06] }; // oblique, so the paddle face shows
@@ -157,7 +180,7 @@ export class HandView {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.08;
-    this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.el.appendChild(this.renderer.domElement);
     const pm = new THREE.PMREMGenerator(this.renderer); // studio reflections for the fabric, shell and wood
     this.scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture; this.scene.environmentIntensity = 0.7; pm.dispose();
@@ -170,12 +193,13 @@ export class HandView {
     this.disc = new THREE.Mesh(new THREE.CircleGeometry(0.2, 72), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.5 })); this.disc.rotation.x = -Math.PI / 2; this.scene.add(this.disc);
     this.ring = new THREE.Mesh(new THREE.RingGeometry(0.19, 0.2, 96), new THREE.MeshBasicMaterial({ color: 0x9fb2c5, transparent: true, opacity: 0.95, side: THREE.DoubleSide })); this.ring.rotation.x = -Math.PI / 2; this.scene.add(this.ring);
     this.trail = new THREE.InstancedMesh(new THREE.SphereGeometry(0.0042, 10, 8), new THREE.MeshBasicMaterial({ color: 0xffffff }), TRAIL); this.trail.visible = false; this.trail.frustumCulled = false; this.scene.add(this.trail);
-    this.hand.model.add(this.paddle); this.paddle.visible = false;
+    attachPaddle(this.hand.model, this.paddle); this.paddle.visible = false;
     this.scene.add(this.hand.root);
     this.placeStage();
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true; this.controls.minDistance = 0.12; this.controls.maxDistance = 1.2;
     this.setView('back');
+    if (typeof location !== 'undefined' && /[?&]debug/.test(location.search)) (window as unknown as { __hand?: HandView }).__hand = this; // for screenshots of the model from fixed angles
     this.ro = new ResizeObserver(() => this.resize());
     this.ro.observe(this.el);
     const loop = (now: number) => { this.raf = requestAnimationFrame(loop); this.frame(now); };
@@ -244,7 +268,7 @@ export class HandView {
   }
 
   private updateTrail(): void {
-    const tip = PADDLE_TIP.clone().applyQuaternion(this.hand.root.quaternion);
+    const tip = PADDLE_TIP.clone(); tip.x *= this.hand.model.scale.x; tip.applyQuaternion(this.hand.root.quaternion);
     this.trailPts.unshift(tip); if (this.trailPts.length > TRAIL) this.trailPts.length = TRAIL;
     const bg = new THREE.Color(0xe6edf5), c = new THREE.Color();
     for (let i = 0; i < TRAIL; i++) {

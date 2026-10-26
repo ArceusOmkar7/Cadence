@@ -5,7 +5,7 @@ import detectorJson from '../config/detector.json';
 import { el } from './dom';
 import type { DetectorConfig } from './detector';
 import { GameEngine, MATCH_POINTS, type GameEvent, type Swing } from './game/engine';
-import { GameView, STROKE_CODE, STROKE_COLOR } from './game/scene';
+import { GameView, STROKE_CODE, STROKE_COLOR, STROKE_NAME } from './game/scene';
 import { LEVELS, STROKES, type Stroke } from './game/shots';
 import { isMuted, setMuted, sfx } from './game/sfx';
 import { sensorToThree } from './hand';
@@ -14,7 +14,7 @@ import { LiveClassifier, type LiveResult, type Mode } from './ml/liveClassifier'
 import { loadModel, type CompactModel } from './ml/xgb';
 import { parsePacket } from './protocol';
 
-const NAME: Record<Stroke, string> = { forehand_drive: 'Forehand', backhand_drive: 'Backhand', smash: 'Smash', push: 'Push' };
+const NAME = STROKE_NAME;
 const KEYS: Record<string, Stroke> = { '1': 'forehand_drive', '2': 'backhand_drive', '3': 'smash', '4': 'push' };
 const MIN_CONF = 0.45;     // below this the glove's answer is treated as "a swing, but unreadable" (a mishit)
 const HEX = (n: number) => '#' + n.toString(16).padStart(6, '0');

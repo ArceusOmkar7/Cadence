@@ -3,31 +3,46 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { GRIP, PADDLE_CENTER, applyCurl, buildHand, buildPaddle } from '../hand';
+import { GRIP, PADDLE_CENTER, applyCurl, attachPaddle, buildHand, buildPaddle, readyQuat } from '../hand';
 import { BALL_R, TABLE } from './physics';
 import type { GameEngine, GameEvent } from './engine';
 import type { Stroke } from './shots';
 
 export const STROKE_COLOR: Record<Stroke, number> = { forehand_drive: 0x4f9dff, backhand_drive: 0x2dd4bf, smash: 0xff7a45, push: 0xb396ff };
 export const STROKE_CODE: Record<Stroke, string> = { forehand_drive: 'FH', backhand_drive: 'BH', smash: 'SM', push: 'PU' };
+export const STROKE_NAME: Record<Stroke, string> = { forehand_drive: 'Forehand', backhand_drive: 'Backhand', smash: 'Smash', push: 'Push' };
 const BALL_VIS = 1.7;      // the real ball is 40 mm: drawn bigger so it can be followed from the back of the room
 const IDLE_POS = new THREE.Vector3(0, 1.02, 1.85);
 const TRAIL = 28;
 
 const basis = (x: number[], y: number[], z: number[]) => new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(...x), new THREE.Vector3(...y), new THREE.Vector3(...z)));
-/** hand frame -> world: blade up, face towards the opponent. A mirrored (right) hand has its red face on the other side. */
-const READY_LEFT = basis([0, 0, -1], [1, 0, 0], [0, -1, 0]);
-const READY_RIGHT = basis([0, 0, 1], [-1, 0, 0], [0, -1, 0]);
+/** hand frame -> world for the handshake grip: blade up, red forehand face looking at the opponent (see hand.ts). A right hand is the mirrored model. */
+const READY_LEFT = readyQuat(false);
+const READY_RIGHT = readyQuat(true);
 const ease = (u: number) => u * u * (3 - 2 * u);
 
-function label(code: string, color: number): THREE.Sprite {
-  const c = document.createElement('canvas'); c.width = 128; c.height = 128;
+function hex(c: number): string { return '#' + c.toString(16).padStart(6, '0'); }
+/** the name of the stroke to play, as a pill that floats over the landing spot (the full word, not a code) */
+function label(text: string, color: number): THREE.Sprite {
+  const c = document.createElement('canvas'); c.width = 400; c.height = 128;
   const g = c.getContext('2d')!;
-  g.fillStyle = '#0b1622'; g.beginPath(); g.arc(64, 64, 58, 0, Math.PI * 2); g.fill();
-  g.lineWidth = 8; g.strokeStyle = '#' + color.toString(16).padStart(6, '0'); g.stroke();
-  g.fillStyle = g.strokeStyle; g.font = '700 54px "Segoe UI", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(code, 64, 68);
+  g.fillStyle = '#0b1622f2'; g.beginPath(); g.roundRect(8, 8, 384, 112, 56); g.fill();
+  g.lineWidth = 8; g.strokeStyle = hex(color); g.shadowColor = hex(color); g.shadowBlur = 18; g.stroke();
+  g.shadowBlur = 0; g.fillStyle = hex(color); g.font = '800 62px "Segoe UI", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(text, 200, 68);
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthTest: false })); s.scale.setScalar(0.2); s.renderOrder = 10;
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthTest: false })); s.scale.set(0.5, 0.16, 1); s.renderOrder = 10;
+  return s;
+}
+let glowTexture: THREE.CanvasTexture | null = null;
+/** a soft round glow (additive), tinted per use: the cheap way to get a bloom look around the shot circles */
+function glow(): THREE.Sprite {
+  if (!glowTexture) {
+    const c = document.createElement('canvas'); c.width = c.height = 128;
+    const g = c.getContext('2d')!, r = g.createRadialGradient(64, 64, 4, 64, 64, 64);
+    r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(0.35, 'rgba(255,255,255,0.45)'); r.addColorStop(1, 'rgba(255,255,255,0)'); g.fillStyle = r; g.fillRect(0, 0, 128, 128);
+    glowTexture = new THREE.CanvasTexture(c);
+  }
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexture, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false })); s.renderOrder = 7; s.visible = false;
   return s;
 }
 
@@ -65,6 +80,9 @@ export class GameView {
   private landing: THREE.Mesh;
   private landingLabels: Record<Stroke, THREE.Sprite>;
   private strikeRing: THREE.Mesh;
+  private approach: THREE.Mesh;
+  private strikeGlow = glow();
+  private landGlow = glow();
   private pulses: Pulse[] = [];
   private shake = 0;
   private fov = 48;
@@ -78,7 +96,7 @@ export class GameView {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping; this.renderer.toneMappingExposure = 1.05;
-    this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.enabled = true; this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.el.appendChild(this.renderer.domElement);
     this.scene.background = new THREE.Color(0x0a121c); this.scene.fog = new THREE.Fog(0x0a121c, 9, 22);
     const pm = new THREE.PMREMGenerator(this.renderer);
@@ -99,9 +117,11 @@ export class GameView {
 
     this.landing = new THREE.Mesh(new THREE.RingGeometry(0.085, 0.11, 40), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthWrite: false }));
     this.landing.rotation.x = -Math.PI / 2; this.landing.visible = false; this.scene.add(this.landing);
-    this.landingLabels = Object.fromEntries((Object.keys(STROKE_COLOR) as Stroke[]).map((s) => { const l = label(STROKE_CODE[s], STROKE_COLOR[s]); l.visible = false; this.scene.add(l); return [s, l]; })) as Record<Stroke, THREE.Sprite>;
+    this.landingLabels = Object.fromEntries((Object.keys(STROKE_COLOR) as Stroke[]).map((s) => { const l = label(STROKE_NAME[s], STROKE_COLOR[s]); l.visible = false; this.scene.add(l); return [s, l]; })) as Record<Stroke, THREE.Sprite>;
     this.strikeRing = new THREE.Mesh(new THREE.RingGeometry(0.15, 0.17, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.0, side: THREE.DoubleSide, depthWrite: false, depthTest: false }));
     this.strikeRing.renderOrder = 9; this.scene.add(this.strikeRing);
+    this.approach = new THREE.Mesh(new THREE.RingGeometry(0.15, 0.162, 64), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, depthTest: false }));
+    this.approach.renderOrder = 9; this.approach.visible = false; this.scene.add(this.approach, this.strikeGlow, this.landGlow);
 
     this.buildPlayer(); this.buildOpponent();
     this.setHanded(fhSign > 0 ? 'right' : 'left');
@@ -142,7 +162,7 @@ export class GameView {
 
   private buildPlayer(): void {
     const h = this.player;
-    h.model.add(this.playerPaddle); applyCurl(h, GRIP);
+    attachPaddle(h.model, this.playerPaddle); applyCurl(h, GRIP);
     this.scene.add(h.root);
   }
 
@@ -158,8 +178,7 @@ export class GameView {
     const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.04, 0.34, 4, 10), body); arm.rotation.x = Math.PI / 2; arm.position.set(0, 0, 0.2);
     const paddle = buildPaddle(); paddle.scale.setScalar(1.15);
     // hand frame -> arm frame: blade up, face to the player (+z)
-    paddle.quaternion.copy(basis([0, 0, 1], [-1, 0, 0], [0, -1, 0])); paddle.position.set(0, 0.05, 0.42);
-    paddle.position.add(new THREE.Vector3(0, 0, -0.137).applyQuaternion(paddle.quaternion).multiplyScalar(-1.15)); // blade centre in front of the hand
+    paddle.quaternion.copy(basis([0, 0, 1], [-1, 0, 0], [0, -1, 0])); paddle.position.set(0, -0.02, 0.4); // blade up, red face towards the player
     this.oppArm.add(arm, paddle);
     this.opp.add(torso, head, visor, base, chest, this.oppArm);
     this.opp.traverse((o) => { (o as THREE.Mesh).castShadow = true; });
@@ -278,6 +297,7 @@ export class GameView {
         else {
           const k = u < 0.35 ? ease(u / 0.35) : 1 - ease((u - 0.35) / 0.65); // out fast, back slowly
           const s = this.kb.stroke, sign = s === 'forehand_drive' ? this.fhSign : s === 'backhand_drive' ? -this.fhSign : 0;
+          if (s === 'backhand_drive') want.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI * ease(Math.min(1, u / 0.12)) * (u < 0.55 ? 1 : 1 - ease((u - 0.55) / 0.45)))); // wrist turn: the black face goes to the front
           const swing = s === 'smash' ? new THREE.Euler(-1.1 + 2.1 * k, 0, 0) : s === 'push' ? new THREE.Euler(-0.1 + 0.55 * k, 0, 0) : new THREE.Euler(0.15, sign * (0.9 - 1.7 * k), 0);
           want.premultiply(new THREE.Quaternion().setFromEuler(swing));
         }
@@ -301,14 +321,25 @@ export class GameView {
 
   private updateCue(e: GameEngine, now: number): void {
     const inc = e.incoming, show = !!inc && e.hitter === 'opp' && !!this.cueStroke && (e.phase === 'rally' || e.phase === 'contact');
-    const lm = this.landing.material as THREE.MeshBasicMaterial, sm = this.strikeRing.material as THREE.MeshBasicMaterial;
+    const lm = this.landing.material as THREE.MeshBasicMaterial, sm = this.strikeRing.material as THREE.MeshBasicMaterial, am = this.approach.material as THREE.MeshBasicMaterial;
     for (const s of Object.keys(this.landingLabels) as Stroke[]) this.landingLabels[s].visible = false;
-    if (!show || !inc) { this.landing.visible = false; sm.opacity = 0; return; }
+    if (!show || !inc) { this.landing.visible = false; sm.opacity = 0; this.approach.visible = false; this.strikeGlow.visible = false; this.landGlow.visible = false; return; }
     const col = STROKE_COLOR[inc.required];
+    // where the ball will bounce: a pulsing ring, a glow and the stroke's name
     this.landing.visible = !this.cueLanded; this.landing.position.set(inc.landing.x, TABLE.top + 0.003, inc.landing.z); lm.color.setHex(col);
     this.landing.scale.setScalar(1 + 0.08 * Math.sin(now / 120));
-    const l = this.landingLabels[inc.required]; l.visible = true; l.position.set(inc.landing.x, TABLE.top + 0.17 + (this.cueLanded ? 0.05 : 0), inc.landing.z);
+    const lg = this.landGlow.material as THREE.SpriteMaterial;
+    this.landGlow.visible = !this.cueLanded; this.landGlow.position.set(inc.landing.x, TABLE.top + 0.02, inc.landing.z); this.landGlow.scale.setScalar(0.36 + 0.04 * Math.sin(now / 120)); lg.color.setHex(col); lg.opacity = 0.7;
+    const l = this.landingLabels[inc.required]; l.visible = true; l.position.set(inc.landing.x, TABLE.top + 0.2 + (this.cueLanded ? 0.05 : 0), inc.landing.z);
+    // where you will meet it: the target circle with a glow, and (like osu) a bigger circle closing in on it; they meet at the moment to swing
     this.strikeRing.position.set(inc.strike.x, inc.strike.y, inc.strike.z); this.strikeRing.lookAt(this.camera.position);
-    sm.color.setHex(col); sm.opacity = e.frozen ? 0.9 : 0.35 + 0.15 * Math.sin(now / 150); this.strikeRing.scale.setScalar(e.frozen ? 1 + 0.12 * Math.sin(now / 45) : 1);
+    this.approach.position.copy(this.strikeRing.position); this.approach.quaternion.copy(this.strikeRing.quaternion);
+    const left = Math.max(0, inc.strike.t - e.flightT), k = e.frozen ? 0 : Math.min(1, left / 0.9);
+    const beat = e.frozen ? 1 + 0.12 * Math.sin(now / 45) : 1;
+    sm.color.setHex(col); sm.opacity = e.frozen ? 1 : 0.55 + 0.15 * Math.sin(now / 150); this.strikeRing.scale.setScalar(beat);
+    this.approach.visible = !e.frozen; am.color.setHex(col); am.opacity = 0.25 + 0.7 * (1 - k); this.approach.scale.setScalar(1 + 2.4 * k * k);
+    const sg = this.strikeGlow.material as THREE.SpriteMaterial;
+    this.strikeGlow.visible = true; this.strikeGlow.position.copy(this.strikeRing.position); sg.color.setHex(col);
+    sg.opacity = e.frozen ? 0.95 : 0.35 + 0.35 * (1 - k); this.strikeGlow.scale.setScalar((e.frozen ? 0.8 : 0.55) * beat);
   }
 }

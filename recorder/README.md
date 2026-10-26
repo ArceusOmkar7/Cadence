@@ -49,7 +49,7 @@ A 3D table-tennis rally against a robot, first to 7 points, four opponents (Rook
 paddle up facing the opponent and **swing any stroke to start** (keyboard fallback: Space). The arena is a Blender model
 (`public/models/arena.glb`, built through the Blender MCP; a plain stand-in is used if it cannot load).
 
-- The incoming ball is marked on the table with the stroke to play (FH, BH, SM, PU). Swing as it reaches your paddle: the ball waits at the
+- The incoming ball is marked on the table with the full name of the stroke to play (Forehand, Backhand, Smash, Push). A glowing target circle shows where you will meet it, and a bigger circle closes in on it like in osu: swing when they meet. Swing as it reaches your paddle: the ball waits at the
   paddle (a "hit-stop") until the glove's classifier has read the swing, about 0.2 s (Fast) after the peak.
 - The right stroke, on time, scores most and sends back a clean ball; a wrong or unreadable stroke still returns, but weaker, and the
   opponent punishes it. Swing intensity sets the ball speed. Placement is random (the glove's heading is not reliable, so it is not used).

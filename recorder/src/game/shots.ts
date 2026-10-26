@@ -27,10 +27,10 @@ export interface Level {
   spin: number;
 }
 export const LEVELS: Level[] = [
-  { name: 'Rookie', blurb: 'Forehands and backhands, slow balls.', speed: 0.8, weights: { forehand_drive: 0.5, backhand_drive: 0.5, smash: 0, push: 0 }, skill: 0.8, fault: 0.08, spin: 0.4 },
-  { name: 'Club player', blurb: 'Short pushes join the mix.', speed: 1.0, weights: { forehand_drive: 0.36, backhand_drive: 0.36, smash: 0, push: 0.28 }, skill: 0.92, fault: 0.06, spin: 0.7 },
-  { name: 'Regional', blurb: 'Lobs to smash, and faster balls.', speed: 1.2, weights: { forehand_drive: 0.3, backhand_drive: 0.3, smash: 0.22, push: 0.18 }, skill: 1.04, fault: 0.05, spin: 0.9 },
-  { name: 'Champion', blurb: 'Quick, spinning, and no mercy.', speed: 1.5, weights: { forehand_drive: 0.28, backhand_drive: 0.28, smash: 0.24, push: 0.2 }, skill: 1.16, fault: 0.03, spin: 1.1 },
+  { name: 'Rookie', blurb: 'Forehands and backhands, slow balls.', speed: 0.7, weights: { forehand_drive: 0.5, backhand_drive: 0.5, smash: 0, push: 0 }, skill: 0.8, fault: 0.08, spin: 0.4 },
+  { name: 'Club player', blurb: 'Short pushes join the mix.', speed: 0.85, weights: { forehand_drive: 0.36, backhand_drive: 0.36, smash: 0, push: 0.28 }, skill: 0.92, fault: 0.06, spin: 0.7 },
+  { name: 'Regional', blurb: 'Lobs to smash, and faster balls.', speed: 1.0, weights: { forehand_drive: 0.3, backhand_drive: 0.3, smash: 0.22, push: 0.18 }, skill: 1.04, fault: 0.05, spin: 0.9 },
+  { name: 'Champion', blurb: 'Quick, spinning, and no mercy.', speed: 1.25, weights: { forehand_drive: 0.28, backhand_drive: 0.28, smash: 0.24, push: 0.2 }, skill: 1.16, fault: 0.03, spin: 1.1 },
 ];
 
 export interface Incoming {

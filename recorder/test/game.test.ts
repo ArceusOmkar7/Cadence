@@ -59,7 +59,7 @@ describe('shots', () => {
 });
 
 describe('engine', () => {
-  it('grades timing', () => { expect(gradeOf(10)).toBe('perfect'); expect(gradeOf(-100)).toBe('great'); expect(gradeOf(-300)).toBe('early'); expect(gradeOf(240)).toBe('late'); });
+  it('grades timing', () => { expect(gradeOf(10)).toBe('perfect'); expect(gradeOf(-100)).toBe('great'); expect(gradeOf(-400)).toBe('early'); expect(gradeOf(320)).toBe('late'); });
 
   /** plays a full match with a perfect, always-on-time player and returns the events */
   function play(seed: number, levelIndex: number, perfect: boolean) {
@@ -108,6 +108,6 @@ describe('engine', () => {
     let g = 0, open = false; while (!open && g++ < 100000) { now += 8; eng.update(now); open = eng.drain().some((e) => e.t === 'contact-open'); }
     eng.swing({ peakMs: now - 900, stroke: 'forehand_drive', confidence: 0.9, power: 0.5, aim: { dx: 0, dz: 0 } }, now);
     expect(eng.phase).toBe('contact');
-    now += 600; eng.update(now); expect(eng.phase).toBe('point'); expect(eng.score.opp).toBe(1);
+    now += 700; eng.update(now); expect(eng.phase).toBe('point'); expect(eng.score.opp).toBe(1);
   });
 });

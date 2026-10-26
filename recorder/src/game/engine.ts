@@ -23,7 +23,7 @@ export type GameEvent =
   | { t: 'match-over'; won: boolean };
 
 export const MATCH_POINTS = 7;
-const WINDOW_EARLY = 350, WINDOW_LATE = 250, HOLD_MS = 450;
+const WINDOW_EARLY = 450, WINDOW_LATE = 350, HOLD_MS = 600; // how far from the ideal moment a swing still counts, and how long the ball waits for the glove
 const AI_STRIKE_Z = -1.68;
 const COMPAT: Record<Stroke, Record<Stroke, number>> = {
   forehand_drive: { forehand_drive: 1, backhand_drive: 0.5, smash: 0.55, push: 0.4 },
@@ -35,7 +35,7 @@ const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 
 export function gradeOf(deltaMs: number): Grade {
   const a = Math.abs(deltaMs);
-  return a < 60 ? 'perfect' : a < 130 ? 'great' : a < 220 ? 'ok' : deltaMs < 0 ? 'early' : 'late';
+  return a < 80 ? 'perfect' : a < 170 ? 'great' : a < 290 ? 'ok' : deltaMs < 0 ? 'early' : 'late';
 }
 const TIMING: Record<Grade, [number, number]> = { perfect: [1, 2], great: [0.8, 1.5], ok: [0.55, 1.2], early: [0.35, 1], late: [0.35, 1] }; // [quality share, score multiplier]
 
@@ -71,6 +71,8 @@ export class GameEngine {
   private queued: Swing | null = null;
   private tail = 0;
   private exchange = 0;
+  /** seconds of flight since the current incoming ball was hit (the ball clock; it stops while the ball waits at your paddle) */
+  flightT = 0;
 
   constructor(private readonly fhSign: number, seed = Date.now()) { this.rng = mulberry32(seed); }
 
@@ -120,7 +122,7 @@ export class GameEngine {
   }
 
   private launch(inc: Incoming, ball: Ball, serve: boolean, faulty: boolean): void {
-    this.incoming = inc; this.ball = copyBall(ball); this.hitter = 'opp'; this.bouncesRecv = 0; this.frozen = false; this.phase = 'rally'; this.acc = 0; this.queued = null;
+    this.incoming = inc; this.ball = copyBall(ball); this.hitter = 'opp'; this.bouncesRecv = 0; this.frozen = false; this.phase = 'rally'; this.acc = 0; this.queued = null; this.flightT = 0;
     this.lastShot = { kmh: inc.kmh, stroke: inc.required };
     this.events.push({ t: 'incoming', inc, serve, faulty });
   }
@@ -140,7 +142,7 @@ export class GameEngine {
     this.acc += dt;
     while (this.acc >= STEP) {
       this.acc -= STEP;
-      const ev = stepBall(b);
+      const ev = stepBall(b); this.flightT += STEP;
       if (this.phase === 'point') { if (ev?.kind === 'floor') this.tail = Math.min(this.tail, 0.6); continue; }
       if (ev) { this.onTouch(ev, now); if (this.phase !== 'rally' || this.ball !== b) return; }
       if (Math.abs(b.z) > 4 || Math.abs(b.x) > 3) { this.onTouch({ kind: 'floor' }, now); return; }
@@ -181,7 +183,7 @@ export class GameEngine {
 
   private aiHit(b: Ball): void {
     const from = { x: clamp(b.x, -0.95, 0.95), y: clamp(b.y, 0.95, 1.2), z: b.z };
-    const lvl = { ...this.level, speed: this.level.speed * (1 + 0.1 * Math.min(this.exchange, 7)) }; // long rallies speed up
+    const lvl = { ...this.level, speed: this.level.speed * (1 + 0.06 * Math.min(this.exchange, 5)) }; // long rallies speed up
     const inc = makeIncoming(this.rng, lvl, this.fhSign, from, pickStroke(this.rng, lvl));
     const faulty = this.rng() < this.level.fault;
     const ball = faulty ? spoil(inc, this.rng() < 0.5 ? 'net' : 'out') : inc.ball;
