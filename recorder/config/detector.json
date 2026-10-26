@@ -1,0 +1,16 @@
+{
+  "version": 3,
+  "smoothingMs": 50,
+  "gyroScaleDps": 500,
+  "accelScaleG": 2,
+  "highThreshold": 0.35,
+  "endFraction": 0.5,
+  "maxAfterPeakMs": 120,
+  "refractoryMs": 400,
+  "maxDtMs": 50,
+  "windowPreMs": 480,
+  "windowPostMs": 320,
+  "recoveryMs": 900,
+  "recoveryRatio": 0.5,
+  "recoveryCos": -0.3
+}

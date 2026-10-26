@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "strokes": [
+    { "id": "forehand_drive", "label": "Forehand drive" },
+    { "id": "backhand_drive", "label": "Backhand drive" },
+    { "id": "smash", "label": "Smash" },
+    { "id": "push", "label": "Push" }
+  ],
+  "idle": {
+    "id": "idle",
+    "label": "Idle",
+    "subLabels": ["rest", "walking", "picking_up_ball", "ready_stance", "half_swing", "adjust_grip", "finger_wiggle", "other"],
+    "defaultSeconds": 60
+  },
+  "targets": { "eventsPerClass": 150, "idleMinutes": 15, "maxSessionShare": 0.4 },
+  "defaults": { "expectedReps": 20, "countdownSeconds": 3, "stillSecondsToAutoEnd": 2, "cueCount": 40, "tempos": { "off": 0, "slow": 2.5, "game": 1.2 } },
+  "_notes": "Add a class (serve, loop, chop) by appending to 'strokes'. Keys 1-9 are assigned in list order; 0 is idle. Bump 'version' when you change the list."
+}

@@ -1,0 +1,112 @@
+DATA: 182 stroke windows in 16 sets (forehand_drive: 55; backhand_drive: 47; smash: 25; push: 55)
+      shadow (no ball): 70 windows, with ball: 112 windows
+sets per class: {'forehand_drive': 4, 'backhand_drive': 4, 'smash': 4, 'push': 4}
+
+=== 1. Leave-one-SET-out (every window is predicted by a model that never saw any window of its set) ===
+XGBoost [imu] (92 features)                                acc 0.648  balanced acc 0.641  macro-F1 0.659  (n=182)
+XGBoost [imu+pose] (106 features)                          acc 0.819  balanced acc 0.804  macro-F1 0.819  (n=182)
+XGBoost [imu+pose+fingers] (130 features)                  acc 0.786  balanced acc 0.760  macro-F1 0.776  (n=182)
+Logistic regression [imu+pose] (baseline)                  acc 0.654  balanced acc 0.612  macro-F1 0.635  (n=182)
+Chance (4 classes) / always the biggest class              acc 0.250 / 0.302
+
+confusion matrix, XGBoost [imu+pose], rows = true, columns = predicted (forehand_drive, backhand_drive, smash, push):
+                forehand  backhand  smash  push
+forehand_drive        44         1      2     8
+backhand_drive         1        44      0     2
+smash                  8         0     17     0
+push                  11         0      0    44
+                precision    recall  f1-score   support
+
+forehand_drive      0.688     0.800     0.739        55
+backhand_drive      0.978     0.936     0.957        47
+         smash      0.895     0.680     0.773        25
+          push      0.815     0.800     0.807        55
+
+      accuracy                          0.819       182
+     macro avg      0.844     0.804     0.819       182
+  weighted avg      0.829     0.819     0.821       182
+
+leave-one-set-out accuracy on shadow-play windows (no ball): 0.657 (n=70), macro-F1 0.675
+leave-one-set-out accuracy on with-ball windows: 0.920 (n=112), macro-F1 0.922
+per held-out set (recall of its class):
+    2140-s11 forehand_drive  shadow  n=17  recall 0.76
+     2140-s3 backhand_drive  shadow  n=16  recall 0.88
+     2140-s4 smash           shadow  n=19  recall 0.58
+     2140-s5 push            shadow  n=18  recall 0.44
+    2341-s11 smash           ball    n= 2  recall 1.00
+    2341-s12 smash           ball    n= 2  recall 1.00
+    2341-s13 push            ball    n= 8  recall 0.88
+    2341-s15 push            ball    n=12  recall 1.00
+    2341-s16 push            ball    n=17  recall 1.00
+     2341-s2 forehand_drive  ball    n= 5  recall 0.80
+     2341-s3 forehand_drive  ball    n=15  recall 1.00
+     2341-s4 forehand_drive  ball    n=18  recall 0.67
+     2341-s5 backhand_drive  ball    n= 6  recall 1.00
+     2341-s7 backhand_drive  ball    n=12  recall 1.00
+     2341-s8 backhand_drive  ball    n=13  recall 0.92
+     2341-s9 smash           ball    n= 2  recall 1.00
+
+=== 2. Repeated 4-fold, grouped by set, 20 random partitions (spread = how much the answer depends on which sets are held out) ===
+XGBoost [imu              ] acc 0.688 +- 0.017 (min 0.670, max 0.742)   macro-F1 0.697 +- 0.016
+XGBoost [imu+pose         ] acc 0.808 +- 0.012 (min 0.780, max 0.835)   macro-F1 0.810 +- 0.010
+XGBoost [imu+pose+fingers ] acc 0.792 +- 0.015 (min 0.758, max 0.819)   macro-F1 0.792 +- 0.014
+
+=== 3. Across conditions (train on one session type, test on the other) ===
+train shadow-play -> test with-ball                        acc 0.643  balanced acc 0.655  macro-F1 0.619  (n=112)
+   per class recall: {'forehand_drive': 0.71, 'backhand_drive': 0.84, 'smash': 0.67, 'push': 0.41}
+   confusion:
+          forehand  backhand  smash  push
+forehand        27         0      3     8
+backhand         3        26      0     2
+smash            2         0      4     0
+push            12         8      2    15
+train with-ball -> test shadow-play                        acc 0.857  balanced acc 0.864  macro-F1 0.855  (n=70)
+   per class recall: {'forehand_drive': 0.94, 'backhand_drive': 0.94, 'smash': 0.58, 'push': 1.0}
+   confusion:
+          forehand  backhand  smash  push
+forehand        16         0      0     1
+backhand         1        15      0     0
+smash            6         1     11     1
+push             0         0      0    18
+
+=== 4. What a careless split would have claimed (random window split, windows of one set on both sides) ===
+XGBoost [imu+pose] random 4-fold: acc 0.954 +- 0.010, macro-F1 0.955  <- inflated, do not quote
+
+=== 5. Stroke-only features vs finger features: which signal carries the answer? ===
+XGBoost [fingers+pressure only] leave-one-set-out          acc 0.352  balanced acc 0.312  macro-F1 0.309  (n=182)
+XGBoost [pose only] leave-one-set-out                      acc 0.709  balanced acc 0.641  macro-F1 0.636  (n=182)
+
+=== 5b. Hyper-parameter sensitivity (leave-one-set-out macro-F1, [imu+pose]); the defaults above were fixed in advance, not tuned ===
+  max_depth 2: n_estimators 100/200/400 -> 0.831 / 0.815 / 0.801
+  max_depth 3: n_estimators 100/200/400 -> 0.835 / 0.819 / 0.806
+  max_depth 4: n_estimators 100/200/400 -> 0.835 / 0.823 / 0.806
+
+=== 6. Top 15 features of the final model (gain; trained on all windows, so descriptive only) ===
+  imu_gy_max                    7.82
+  imu_gy_atpeak                 7.21
+  imu_ay_dv_pre                 6.65
+  imu_ax_mean                   6.09
+  imu_gx_tmin                   4.94
+  imu_gdir_y                    4.82
+  imu_gy_min                    4.21
+  imu_gz_angle_post             4.13
+  pose_roll_delta               3.92
+  imu_ax_dv_pre                 3.87
+  imu_pre_post_cos              3.64
+  imu_amag_std                  3.59
+  imu_gy_std                    3.24
+  imu_amag_mean                 3.02
+  imu_amag_max                  2.77
+
+=== 7. Windows from idle sets (not strokes; the model has no 'none' class) ===
+  2140-s6 peak 2.36: predicted backhand_drive (p=0.96)
+  2140-s6 peak 0.48: predicted forehand_drive (p=0.67)
+  2140-s6 peak 2.11: predicted backhand_drive (p=0.92)
+  2341-s17 peak 0.35: predicted forehand_drive (p=0.66)
+  2341-s17 peak 0.43: predicted forehand_drive (p=0.68)
+  2341-s17 peak 0.37: predicted forehand_drive (p=0.55)
+  2341-s17 peak 0.51: predicted forehand_drive (p=0.91)
+  2341-s17 peak 0.42: predicted push (p=0.96)
+  2341-s17 peak 0.54: predicted forehand_drive (p=0.45)
+  2341-s17 peak 0.49: predicted push (p=0.97)
+  strokes, for reference: median max-probability under leave-one-set-out = 0.87

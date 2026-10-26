@@ -1,0 +1,29 @@
+session,set,label,kind,status,ball,note,peaks,windows,dropped_weak,dropped_edge,dropped_gap,expected,hz,secs
+20261025-162140,s1,forehand_drive,stroke,discarded,False,discarded in the app,,,,,,,,
+20261025-162140,s2,forehand_drive,stroke,discarded,False,discarded in the app,,,,,,,,
+20261025-162140,s3,backhand_drive,stroke,ok,False,used,16.0,16.0,0.0,0.0,0.0,20.0,199.9,34.0
+20261025-162140,s4,smash,stroke,ok,False,used,20.0,19.0,0.0,0.0,1.0,20.0,198.8,57.0
+20261025-162140,s5,push,stroke,ok,False,used,18.0,18.0,0.0,0.0,0.0,20.0,199.7,48.0
+20261025-162140,s6,idle,idle,ok,False,used,3.0,3.0,0.0,0.0,0.0,,199.9,22.0
+20261025-162140,s7,idle,idle,ok,False,"mixed glove runs (dup seq 6658, 310 Hz)",,,,,,,,
+20261025-162140,s8,mixed,cue,discarded,False,discarded in the app,,,,,,,,
+20261025-162140,s9,mixed,cue,ok,False,mixed/cue set: labels not verified,,,,,,,,
+20261025-162140,s10,forehand_drive,stroke,discarded,False,discarded in the app,,,,,,,,
+20261025-162140,s11,forehand_drive,stroke,ok,False,used,20.0,17.0,0.0,0.0,3.0,20.0,197.6,48.0
+20261025-172341,s1,forehand_drive,stroke,discarded,True,discarded in the app,,,,,,,,
+20261025-172341,s2,forehand_drive,stroke,ok,True,used,6.0,5.0,0.0,1.0,0.0,20.0,199.9,12.0
+20261025-172341,s3,forehand_drive,stroke,ok,True,used,15.0,15.0,0.0,0.0,0.0,20.0,199.0,39.0
+20261025-172341,s4,forehand_drive,stroke,ok,True,used,19.0,18.0,0.0,0.0,1.0,20.0,197.9,66.0
+20261025-172341,s5,backhand_drive,stroke,ok,True,used,7.0,6.0,0.0,0.0,1.0,20.0,199.3,20.0
+20261025-172341,s6,backhand_drive,stroke,discarded,True,discarded in the app,,,,,,,,
+20261025-172341,s7,backhand_drive,stroke,ok,True,used,12.0,12.0,0.0,0.0,0.0,20.0,199.7,63.0
+20261025-172341,s8,backhand_drive,stroke,ok,True,used,14.0,13.0,0.0,1.0,0.0,20.0,197.1,48.0
+20261025-172341,s9,smash,stroke,ok,True,used,3.0,2.0,1.0,1.0,0.0,20.0,199.5,18.0
+20261025-172341,s10,smash,stroke,discarded,True,discarded in the app,,,,,,,,
+20261025-172341,s11,smash,stroke,ok,True,used,3.0,2.0,0.0,0.0,1.0,20.0,199.1,36.0
+20261025-172341,s12,smash,stroke,ok,True,used,3.0,2.0,0.0,0.0,1.0,20.0,199.0,25.0
+20261025-172341,s13,push,stroke,ok,True,used,8.0,8.0,0.0,0.0,0.0,20.0,196.0,31.0
+20261025-172341,s14,push,stroke,discarded,True,discarded in the app,,,,,,,,
+20261025-172341,s15,push,stroke,ok,True,used,13.0,12.0,0.0,1.0,0.0,20.0,199.9,53.0
+20261025-172341,s16,push,stroke,ok,True,used,19.0,17.0,0.0,0.0,2.0,20.0,198.5,50.0
+20261025-172341,s17,idle,idle,ok,True,used,7.0,7.0,0.0,0.0,0.0,,198.2,60.0

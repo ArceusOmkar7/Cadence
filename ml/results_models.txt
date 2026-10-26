@@ -1,0 +1,13 @@
+
+===== window ends 160 ms after the detector peak; leave-one-set-out; 3 seeds for models with randomness =====
+XGBoost (current)                  all-triggers 0.714 | acc 0.775 macro-F1 0.738 stroke-type 0.777 stroke->none 0.070 none-recall 0.75 extra->none 0.43  (46s)
+LightGBM                           all-triggers 0.718 | acc 0.769 macro-F1 0.736 stroke-type 0.771 stroke->none 0.083 none-recall 0.75 extra->none 0.49  (17s)
+sklearn HistGradientBoosting       all-triggers 0.694 | acc 0.734 macro-F1 0.719 stroke-type 0.726 stroke->none 0.096 none-recall 0.83 extra->none 0.51  (457s)
+Random forest                      all-triggers 0.689 | acc 0.799 macro-F1 0.730 stroke-type 0.803 stroke->none 0.019 none-recall 0.75 extra->none 0.19  (71s)
+Extra trees                        all-triggers 0.680 | acc 0.734 macro-F1 0.653 stroke-type 0.739 stroke->none 0.070 none-recall 0.67 extra->none 0.43  (60s)
+Logistic regression                all-triggers 0.563 | acc 0.621 macro-F1 0.602 stroke-type 0.611 stroke->none 0.121 none-recall 0.75 extra->none 0.30  (1s)
+SVM (RBF)                          all-triggers 0.641 | acc 0.651 macro-F1 0.599 stroke-type 0.631 stroke->none 0.261 none-recall 0.92 extra->none 0.59  (3s)
+k-nearest neighbours (k=7)         all-triggers 0.655 | acc 0.746 macro-F1 0.689 stroke-type 0.732 stroke->none 0.057 none-recall 0.92 extra->none 0.24  (1s)
+Small neural net (MLP)             all-triggers 0.650 | acc 0.686 macro-F1 0.675 stroke-type 0.688 stroke->none 0.172 none-recall 0.67 extra->none 0.49  (50s)
+Vote: XGBoost + Random forest      all-triggers 0.718 | acc 0.781 macro-F1 0.737 stroke-type 0.783 stroke->none 0.064 none-recall 0.75 extra->none 0.43
+Vote: XGBoost + LightGBM + Extra trees + SVM all-triggers 0.738 | acc 0.787 macro-F1 0.746 stroke-type 0.790 stroke->none 0.076 none-recall 0.75 extra->none 0.51

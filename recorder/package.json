@@ -1,0 +1,33 @@
+{
+  "name": "glove-recorder",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Table tennis stroke recorder for the glove: records raw sensor streams, detects strokes, exports session folders.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "start": "npm run build && node server/relay.mjs",
+    "relay": "node server/relay.mjs",
+    "fake-glove": "node server/fake-glove.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "smoke": "node server/smoke.mjs",
+    "glove-check": "node server/glove-check.mjs",
+    "test:relay": "node server/relay-regression.mjs"
+  },
+  "dependencies": {
+    "fflate": "^0.8.3",
+    "three": "^0.186.1",
+    "ws": "^8.22.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "@types/three": "^0.186.0",
+    "@types/ws": "^8.18.2",
+    "puppeteer-core": "^25.16.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}

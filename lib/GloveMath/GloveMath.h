@@ -28,10 +28,16 @@ inline Quat qMul(const Quat &a, const Quat &b) {
           a.w*b.y - a.x*b.z + a.y*b.w + a.z*b.x,
           a.w*b.z + a.x*b.y - a.y*b.x + a.z*b.w};
 }
+inline Quat qConj(const Quat &q) { return {q.w, -q.x, -q.y, -q.z}; }
 inline Quat qNormalized(Quat q) {
   float n = sqrtf(q.w*q.w + q.x*q.x + q.y*q.y + q.z*q.z);
   if (n < 1e-9f) return Quat();
   float s = 1/n; return {q.w*s, q.x*s, q.y*s, q.z*s};
+}
+// Rotate a vector by q (v_A = q_AB v_B).
+inline Vec3 qRotate(const Quat &q, const Vec3 &v) {
+  Quat r = qMul(qMul(q, Quat{0, v.x, v.y, v.z}), qConj(q));
+  return {r.x, r.y, r.z};
 }
 inline Quat qFromAxisAngle(const Vec3 &axis, float angle) {
   float s = sinf(angle/2); return {cosf(angle/2), axis.x*s, axis.y*s, axis.z*s};
@@ -100,39 +106,86 @@ struct Mahony {
 
 // Raw MPU samples in, hand orientation out. Applies accel offset/scale and gyro bias from calibration,
 // tracks gyro bias slowly while the hand is still, and maps S -> H with the mounting quaternion.
+// All time constants are in seconds, so the filter behaves the same at 100 Hz or 200 Hz.
 struct ImuFusion {
   Mahony filter;
   Vec3 gyroBias, accOff, accScale = {1,1,1}; // deg/s, g, unitless
   Quat mount, yaw; bool hasMount = false;    // q_SH, and the world-Z heading offset
-  Vec3 gLow, aLow; uint16_t stillCount = 0, warm = 0;
+  Vec3 gLow, aLow, lastAcc, lastGyro;        // low-passes for stillness; last corrected sample (g, deg/s, sensor frame)
+  float stillTime = 0, warmTime = 0;         // s
   float trackRange = 20.0f; // deg/s: how far zero-rate tracking may move the bias; tighten once the bias is calibrated
 
   Vec3 correctAccel(const Vec3 &raw) const {
     return {(raw.x - accOff.x)*accScale.x, (raw.y - accOff.y)*accScale.y, (raw.z - accOff.z)*accScale.z};
   }
-  void restart() { filter = Mahony(); warm = 0; stillCount = 0; }
+  void restart() { filter = Mahony(); warmTime = 0; stillTime = 0; }
   void update(const Vec3 &rawAccG, const Vec3 &rawGyroDps, float dt) {
     Vec3 a = correctAccel(rawAccG);
     Vec3 g = {rawGyroDps.x - gyroBias.x, rawGyroDps.y - gyroBias.y, rawGyroDps.z - gyroBias.z};
     // Zero-rate tracking: noise-only gyro, steady 1 g, and still near the current bias. The trackRange cap stops a
     // slow constant turn from being learned as bias.
-    gLow.x += 0.05f*(rawGyroDps.x - gLow.x); gLow.y += 0.05f*(rawGyroDps.y - gLow.y); gLow.z += 0.05f*(rawGyroDps.z - gLow.z);
+    float lp = clampf(dt/0.2f, 0, 1); // 0.2 s low-pass
+    gLow.x += lp*(rawGyroDps.x - gLow.x); gLow.y += lp*(rawGyroDps.y - gLow.y); gLow.z += lp*(rawGyroDps.z - gLow.z);
     Vec3 dev = {rawGyroDps.x - gLow.x, rawGyroDps.y - gLow.y, rawGyroDps.z - gLow.z};
     Vec3 da = {a.x - aLow.x, a.y - aLow.y, a.z - aLow.z}; // against a low-pass, so sensor noise alone does not break stillness
-    aLow.x += 0.05f*da.x; aLow.y += 0.05f*da.y; aLow.z += 0.05f*da.z;
-    bool still = norm(dev) < 1.0f && norm(da) < 0.015f && fabsf(norm(a) - 1) < 0.03f &&
+    aLow.x += lp*da.x; aLow.y += lp*da.y; aLow.z += lp*da.z;
+    bool still = norm(dev) < 1.0f && norm(da) < 0.025f && fabsf(norm(a) - 1) < 0.03f &&
                  norm({gLow.x - gyroBias.x, gLow.y - gyroBias.y, gLow.z - gyroBias.z}) < trackRange;
-    stillCount = still ? (stillCount < 65535 ? stillCount + 1 : stillCount) : 0;
-    if (stillCount >= 100) { // 1 s of stillness at 100 Hz, then ~5 s time constant
-      gyroBias.x += 0.002f*g.x; gyroBias.y += 0.002f*g.y; gyroBias.z += 0.002f*g.z;
+    stillTime = still ? stillTime + dt : 0;
+    if (stillTime >= 1.0f) { // after 1 s of stillness, ~5 s time constant
+      float k = clampf(dt/5.0f, 0, 1);
+      gyroBias.x += k*g.x; gyroBias.y += k*g.y; gyroBias.z += k*g.z;
     }
     // First 2 s: strong accelerometer pull so the tilt locks on quickly after power-up.
-    filter.update(scaled(g, DEG2RAD), a, dt, warm < 200 ? 8.0f : 1.0f);
-    if (warm < 200) warm++;
+    filter.update(scaled(g, DEG2RAD), a, dt, warmTime < 2.0f ? 8.0f : 1.0f);
+    warmTime += dt; lastAcc = a; lastGyro = g;
   }
   Quat handInWorld() const { return qMul(filter.q, mount); }
   Quat orientation() const { return qNormalized(qMul(yaw, handInWorld())); }
   void resetHeading() { yaw = qFromAxisAngle({0,0,1}, -qYaw(handInWorld())); }
+  // Gravity direction in the sensor frame as the filter currently believes it (unit vector).
+  Vec3 gravityS() const {
+    const Quat &q = filter.q;
+    return {2*(q.x*q.z - q.w*q.y), 2*(q.w*q.x + q.y*q.z), q.w*q.w - q.x*q.x - q.y*q.y + q.z*q.z};
+  }
+  // Last sample in the hand frame. Acceleration has the estimated gravity removed (g); rate is bias-corrected (deg/s).
+  // Independent of heading, so it is safe as a classifier input.
+  Vec3 dynAccelHand() const {
+    Vec3 g = gravityS();
+    return qRotate(qConj(mount), {lastAcc.x - g.x, lastAcc.y - g.y, lastAcc.z - g.z});
+  }
+  Vec3 gyroHand() const { return qRotate(qConj(mount), lastGyro); }
+};
+
+// Maps a free-running sample counter to a microsecond timeline when only the time of each *read* is known.
+// A sample cannot be newer than the read that returned it, so the true start of the sample train is bounded above by
+// every read; the estimate follows the lowest bound (rising slowly to track clock drift). The sample period is
+// re-measured against the host crystal every 2 s, which also corrects the MPU's own clock error (it is only ~1% accurate).
+struct SampleClock {
+  int64_t anchorT = 0;           // us, time of sample anchorSeq
+  uint32_t anchorSeq = 0, periodQ16, nominalQ16; // period in us, Q16.16
+  bool primed = false;
+  uint32_t winSeq = 0; int64_t winT = 0, lastStamp = 0;
+  explicit SampleClock(uint32_t nominalUs = 5000) : periodQ16(nominalUs << 16), nominalQ16(nominalUs << 16) {}
+  float periodUs() const { return periodQ16 / 65536.0f; }
+  int64_t timeOf(uint32_t seq) const { return anchorT + ((int64_t(int32_t(seq - anchorSeq))*periodQ16) >> 16); }
+  // Timestamp to emit for a sample: timeOf(), but never earlier than 1 us after the previous one (the estimate
+  // can step back by a few hundred us when a read turns out to have had low latency).
+  int64_t stamp(uint32_t seq) { int64_t t = timeOf(seq); if (t <= lastStamp) t = lastStamp + 1; return lastStamp = t; }
+  // newestSeq: counter of the newest sample in this read; readUs: when the read happened.
+  void onRead(uint32_t newestSeq, int64_t readUs) {
+    if (!primed) { anchorSeq = winSeq = newestSeq; anchorT = winT = readUs; primed = true; return; }
+    int64_t cand = readUs - ((int64_t(int32_t(newestSeq - anchorSeq))*periodQ16) >> 16);
+    if (cand < anchorT) anchorT = cand; else anchorT += 2;
+    if (readUs - winT >= 2000000 && int32_t(newestSeq - winSeq) > 0) {
+      int64_t measured = ((readUs - winT) << 16)/int32_t(newestSeq - winSeq);
+      if (measured > int64_t(nominalQ16)*97/100 && measured < int64_t(nominalQ16)*103/100) {
+        anchorT = timeOf(newestSeq); anchorSeq = newestSeq;       // re-anchor so the new period starts from here
+        periodQ16 = uint32_t(int64_t(periodQ16) + (measured - int64_t(periodQ16))/4);
+      }
+      winSeq = newestSeq; winT = readUs;
+    }
+  }
 };
 
 // Flex sensor in a divider: the voltage is across the fixed resistor, so the flex resistance is derived first.

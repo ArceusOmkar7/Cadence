@@ -1,0 +1,76 @@
+
+================ live window ends 160 ms after the detector's peak (classification 185 ms after the energy peak, ~40 ms after the detector fires) ================
+features: 93; training = offline strokes +-80 ms jitter + live-detector windows + idle bumps + extra triggers (weight 0.1); leave-one-set-out, 3 seeds averaged
+live windows evaluated: 169 (strokes 157, idle triggers 12) + 37 extra triggers inside stroke sets
+accuracy 0.775; stroke type among real strokes 0.777; real stroke lost as 'none' 0.070; idle trigger rejected 0.750; extra triggers rejected 0.432
+   shadow windows: accuracy 0.707 (n=75)
+   ball   windows: accuracy 0.830 (n=94)
+accuracy, bootstrap over 19 sets: 95% interval 0.670 - 0.888
+confusion matrix (rows true, columns predicted: forehand_drive, backhand_drive, smash, push, none)
+          forehand  backhand  smash  push  none
+forehand        29         0      2     6     5
+backhand         2        42      0     1     1
+smash           10         0     14     0     0
+push             3         0      0    37     5
+none             0         2      0     1     9
+recall per class: forehand_drive 0.69 (n=42), backhand_drive 0.91 (n=46), smash 0.58 (n=24), push 0.82 (n=45), none 0.75 (n=12)
+
+confidence cut-off (below it the app says 'unsure' instead of a class):
+   max-probability >= 0.0: answers 100% of triggers, accuracy on those 0.775
+   max-probability >= 0.5: answers 89% of triggers, accuracy on those 0.815
+   max-probability >= 0.6: answers 80% of triggers, accuracy on those 0.831
+   max-probability >= 0.7: answers 70% of triggers, accuracy on those 0.840
+   max-probability >= 0.8: answers 55% of triggers, accuracy on those 0.828
+   max-probability >= 0.9: answers 44% of triggers, accuracy on those 0.880
+
+top 12 features of the final model (mean gain over 3 seeds; descriptive only):
+   imu_gy_max                22.11
+   imu_gy_atpeak             21.27
+   pose_pitch_min            15.82
+   imu_gdir_y                14.62
+   imu_gy_min                13.63
+   imu_gz_angle_post         12.87
+   pose_pitch_peak           12.57
+   imu_ay_dv_pre             12.51
+   imu_amag_max              11.00
+   imu_amag_mean             10.87
+   imu_ax_mean               10.54
+   pose_pitch_start           9.98
+
+================ live window ends 320 ms after the detector's peak (classification 345 ms after the energy peak, ~200 ms after the detector fires) ================
+features: 93; training = offline strokes +-80 ms jitter + live-detector windows + idle bumps + extra triggers (weight 0.1); leave-one-set-out, 3 seeds averaged
+live windows evaluated: 169 (strokes 157, idle triggers 12) + 37 extra triggers inside stroke sets
+accuracy 0.805; stroke type among real strokes 0.809; real stroke lost as 'none' 0.057; idle trigger rejected 0.750; extra triggers rejected 0.486
+   shadow windows: accuracy 0.760 (n=75)
+   ball   windows: accuracy 0.840 (n=94)
+accuracy, bootstrap over 19 sets: 95% interval 0.692 - 0.907
+confusion matrix (rows true, columns predicted: forehand_drive, backhand_drive, smash, push, none)
+          forehand  backhand  smash  push  none
+forehand        32         1      2     3     4
+backhand         2        42      0     1     1
+smash           10         0     14     0     0
+push             2         0      0    39     4
+none             0         2      0     1     9
+recall per class: forehand_drive 0.76 (n=42), backhand_drive 0.91 (n=46), smash 0.58 (n=24), push 0.87 (n=45), none 0.75 (n=12)
+
+confidence cut-off (below it the app says 'unsure' instead of a class):
+   max-probability >= 0.0: answers 100% of triggers, accuracy on those 0.805
+   max-probability >= 0.5: answers 93% of triggers, accuracy on those 0.828
+   max-probability >= 0.6: answers 83% of triggers, accuracy on those 0.830
+   max-probability >= 0.7: answers 70% of triggers, accuracy on those 0.840
+   max-probability >= 0.8: answers 60% of triggers, accuracy on those 0.853
+   max-probability >= 0.9: answers 47% of triggers, accuracy on those 0.875
+
+top 12 features of the final model (mean gain over 3 seeds; descriptive only):
+   imu_az_dv_post            21.82
+   imu_gy_max                20.40
+   imu_gdir_y                18.06
+   imu_amag_mean             17.23
+   imu_gy_min                14.98
+   pose_pitch_min            14.21
+   imu_acc_over_gyro         13.73
+   imu_gyro_jerk_max         13.14
+   imu_ay_dv_pre             12.14
+   pose_pitch_peak           11.90
+   pose_pitch_start          10.37
+   imu_ax_min                 9.81

@@ -16,3 +16,16 @@ __pycache__/
 node_modules/
 dist/
 .claude/
+
+calibration_snapshot.json
+
+# recorder
+recorder/e2e-out/
+recorder/dist/
+
+# ml pipeline
+ml/.venv/
+ml/windows.npy
+ml/__pycache__/
+recorder/e2e-out-use/
+recorder/.impeccable/questions/
