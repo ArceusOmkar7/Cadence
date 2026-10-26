@@ -162,13 +162,13 @@ export class UseScreen {
     fill(this.root,
       el('div', { class: 'ustrip' }, modeSeg, targetSeg, speedSeg, el('span', { class: 'sub' }, `${this.speed === 'fast' ? fastMs : accMs} ms after the swing peak`),
         el('label', { class: 'uthresh' }, 'Answer when at least ', slider, ' ', sliderVal, ' sure'), reset),
-      this.nodes.status, this.nodes.tally,
+      el('div', { class: 'ustatusrow' }, this.nodes.status, this.nodes.tally),
       el('div', { class: 'ugrid' },
         el('div', { class: 'ucol' }, this.nodes.answer, this.mode === 'drill' ? this.nodes.drill : null,
-          el('div', { class: 'umove' }, el('span', {}, 'Movement'), el('div', { class: 'meter', 'aria-label': 'Live movement energy' }, this.nodes.meter))),
-        el('div', { class: 'ucol' },
-          el('section', { class: 'upanel uhand' }, el('div', { class: 'row' }, el('h2', {}, 'Live hand'), ...(['back', 'palm', 'side'] as const).map((v) => el('button', { onclick: () => d.hand.setView(v) }, v))), d.hand.el),
-          el('section', { class: 'upanel' }, el('h2', {}, 'Recent strokes'), this.nodes.tape))),
+          el('div', { class: 'umove' }, el('span', {}, 'Movement'), el('div', { class: 'meter', 'aria-label': 'Live movement energy' }, this.nodes.meter)),
+          el('section', { class: 'upanel' }, el('h2', {}, 'Recent strokes'), this.nodes.tape)),
+        el('div', { class: 'ucol uhandcol' },
+          el('section', { class: 'upanel uhand' }, el('div', { class: 'row' }, el('h2', {}, 'Live hand'), ...(['back', 'palm', 'side'] as const).map((v) => el('button', { onclick: () => d.hand.setView(v) }, v))), d.hand.el))),
       this.evidence(), this.loadError ? el('p', { class: 'banner bad', role: 'alert' }, this.loadError) : null);
     this.paintStatus(); this.paintAnswer(false); this.paintTape(); this.paintTally(); this.paintDrill();
     void d;

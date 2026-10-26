@@ -29,3 +29,5 @@ ml/windows.npy
 ml/__pycache__/
 recorder/e2e-out-use/
 recorder/.impeccable/questions/
+recorder/test/out/
+recorder/e2e-out-game/

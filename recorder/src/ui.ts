@@ -11,6 +11,7 @@ import type { ImuRec } from './protocol';
 import { Recorder, missingCalibration, type SetRequest } from './recorder';
 import { el, type Kid } from './dom';
 import { UseScreen } from './useScreen';
+import { GameScreen } from './gameScreen';
 import { PROTOCOL_HINTS, computeStats } from './stats';
 import * as db from './storage';
 import type { ClassesConfig, EventRec, SessionRec, SetRec } from './types';
@@ -31,8 +32,9 @@ export class App {
   private recorder!: Recorder;
   private hand = new HandView();
   private screen: Screen = 'session';
-  private section: 'train' | 'use' = 'train';
+  private section: 'train' | 'use' | 'game' = 'train';
   private use!: UseScreen;
+  private game!: GameScreen;
   private root: HTMLElement;
   private main = el('main');
   private detectorCfg: DetectorConfig = baseDetector;
@@ -62,13 +64,14 @@ export class App {
     app.recorder = new Recorder(app.link, db, classes, app.detectorCfg, { change: () => app.schedule(), beep: (f, ms) => app.beep(f, ms), now: () => Date.now() });
     app.use = new UseScreen({ link: app.link, hand: app.hand, calibration: () => app.recorder.calibration, refreshCalibration: async () => { await app.recorder.refreshCalibration(); }, recording: () => !!app.recorder.active, gotoTrain: () => app.setSection('train') });
     app.use.setDetector(app.detectorCfg);
-    app.link.onPacket = (b, rx) => { app.recorder.handlePacket(b, rx); if (app.section === 'use') app.use.feed(b); };
+    app.game = new GameScreen({ link: app.link, recording: () => !!app.recorder.active, gotoTrain: () => app.setSection('train') });
+    app.link.onPacket = (b, rx) => { app.recorder.handlePacket(b, rx); if (app.section === 'use') app.use.feed(b); else if (app.section === 'game') app.game.feed(b); };
     app.link.onText = (m) => app.onGloveText(m);
     app.link.onRelay = (r) => {
       const k = `${r?.glove}|${r?.host}|${r?.streaming}`; // not on every 1 s heartbeat
       if (k === app.relayKey) return;
       app.relayKey = k;
-      if (app.section === 'use') app.use.ensureStream(true);
+      if (app.section === 'use') app.use.ensureStream(true); else if (app.section === 'game') app.game.ensureStream(true);
       if (r?.host && r.glove === 'open') { app.fv.host = r.host; localStorage.setItem('gloveHost', r.host); } // show the glove the relay is really using
       if (r?.glove === 'open') { if (app.msg.startsWith('Connecting')) app.msg = ''; void app.pollCalibration(); }
       app.schedule();
@@ -78,7 +81,7 @@ export class App {
     void db.requestPersistence();
     const host = localStorage.getItem('gloveHost');
     if (host) app.link.connect(host);
-    setInterval(() => { app.recorder.tick(); app.updateLive(); if (app.section === 'use') app.use.tick(); }, 100);
+    setInterval(() => { app.recorder.tick(); app.updateLive(); if (app.section === 'use') app.use.tick(); else if (app.section === 'game') app.game.tick(); }, 100);
     setInterval(() => void app.pollCalibration(), 4000);
     addEventListener('keydown', (e) => app.onKey(e));
     app.mount();
@@ -136,12 +139,14 @@ export class App {
     this.root.replaceChildren(el('div', { class: 'shell' }, this.main));
     this.render();
   }
-  private setSection(s: 'train' | 'use'): void {
+  private setSection(s: 'train' | 'use' | 'game'): void {
     if (s === this.section) return;
-    if (s === 'use' && this.recorder.active) { this.say('A set is recording. Finish or discard it before opening Use.', true); return; }
+    if (s !== 'train' && this.recorder.active) { this.say(`A set is recording. Finish or discard it before opening ${s === 'use' ? 'Use' : 'Game'}.`, true); return; }
     if (this.section === 'use') this.use.deactivate();
+    if (this.section === 'game') this.game.deactivate();
     this.section = s; this.msg = '';
     if (s === 'use') this.use.activate();
+    if (s === 'game') this.game.activate();
     this.schedule();
   }
   private go(s: Screen): void { this.screen = s; this.review = this.review && s === 'review' ? this.review : null; this.schedule(); }
@@ -151,10 +156,10 @@ export class App {
     const state = !r ? 'Recorder service not running (npm start)' : r.glove === 'open' ? 'Glove connected' : r.glove === 'connecting' ? 'Connecting to the glove…' : r.glove === 'closed' ? 'Glove connection lost, retrying' : 'No glove selected';
     const cls = r?.glove === 'open' ? 'ok' : r ? 'warn' : 'bad';
     const tabs: [Screen, string][] = [['session', 'Session'], ['record', 'Record'], ['review', 'Review'], ['dashboard', 'Dashboard'], ['settings', 'Settings']];
-    const sec = (s: 'train' | 'use', t: string) => el('button', { class: 'tab sec' + (this.section === s ? ' on' : ''), 'aria-pressed': String(this.section === s), onclick: () => this.setSection(s) }, t);
+    const sec = (s: 'train' | 'use' | 'game', t: string) => el('button', { class: 'tab sec' + (this.section === s ? ' on' : ''), 'aria-pressed': String(this.section === s), onclick: () => this.setSection(s) }, t);
     return el('header', {},
       el('h1', {}, 'Glove'),
-      el('div', { class: 'seg secs', role: 'group', 'aria-label': 'Section' }, sec('train', 'Train'), sec('use', 'Use')),
+      el('div', { class: 'seg secs', role: 'group', 'aria-label': 'Section' }, sec('train', 'Train'), sec('use', 'Use'), sec('game', 'Game')),
       this.section === 'train' ? el('nav', {}, ...tabs.map(([s, t]) => el('button', { class: 'tab' + (this.screen === s ? ' on' : ''), onclick: () => this.go(s) }, t))) : null,
       el('div', { class: 'conn ' + cls, role: 'status' }, state, this.recorder.session ? ` · session ${this.recorder.session.id}` : ''),
     );
@@ -166,7 +171,7 @@ export class App {
     if (this.recorder.lastError) kids.push(el('p', { class: 'banner bad', role: 'alert' }, this.recorder.lastError));
     if (this.section === 'train' && this.recorder.pendingSets.length && this.screen !== 'review') kids.push(el('p', { class: 'banner warn' }, `${this.recorder.pendingSets.length} set(s) need a decision (keep, discard or review): see the list on the Record screen.`));
     this.live = {};
-    const body = this.section === 'use' ? this.use.root : { session: () => this.sessionScreen(), record: () => this.recordScreen(), review: () => this.reviewScreen(), dashboard: () => this.dashboardScreen(), settings: () => this.settingsScreen() }[this.screen]();
+    const body = this.section === 'use' ? this.use.root : this.section === 'game' ? this.game.root : { session: () => this.sessionScreen(), record: () => this.recordScreen(), review: () => this.reviewScreen(), dashboard: () => this.dashboardScreen(), settings: () => this.settingsScreen() }[this.screen]();
     kids.push(body);
     this.main.replaceChildren(...(kids.filter(Boolean) as Node[]));
   }
@@ -270,6 +275,7 @@ export class App {
   }
   private onKey(e: KeyboardEvent): void {
     if (this.section === 'use') { this.use.onKey(e); return; }
+    if (this.section === 'game') { this.game.onKey(e); return; }
     if (this.screen !== 'record' || (e.target as HTMLElement)?.matches?.('input, select, textarea')) return;
     const a = this.recorder.active;
     if (e.code === 'Space') { e.preventDefault(); if (!a) void this.startSet(); else this.recorder.endSet('user'); }

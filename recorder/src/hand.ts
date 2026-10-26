@@ -21,11 +21,11 @@ function limb(len: number, r0: number, r1: number): THREE.BufferGeometry {
   return g;
 }
 
-interface HandModel {
+export interface HandModel {
   root: THREE.Group; model: THREE.Group; fingers: THREE.Group[][]; thumbRoot: THREE.Group; thumb: THREE.Group[]; press: THREE.Mesh;
 }
 
-function buildHand(): HandModel {
+export function buildHand(): HandModel {
   const std = (color: number, roughness: number, metalness = 0) => new THREE.MeshStandardMaterial({ color, roughness, metalness });
   const fabric = new THREE.MeshPhysicalMaterial({ color: 0x2f3742, roughness: 0.78, metalness: 0.02, sheen: 0.9, sheenRoughness: 0.45, sheenColor: new THREE.Color(0x7d8da1) });
   const shell = new THREE.MeshPhysicalMaterial({ color: 0x14171b, roughness: 0.4, metalness: 0.25, clearcoat: 0.7, clearcoatRoughness: 0.25 });
@@ -77,7 +77,7 @@ function buildHand(): HandModel {
 
 /** A shakehand table-tennis paddle in hand coordinates: handle along the palm, blade beyond the fingers, face normal along x. */
 export const PADDLE_TIP = new THREE.Vector3(0, -0.032, -0.215);
-function buildPaddle(): THREE.Group {
+export function buildPaddle(): THREE.Group {
   const g = new THREE.Group();
   const wood = new THREE.MeshPhysicalMaterial({ color: 0xcf9f66, roughness: 0.5, clearcoat: 0.3 });
   const red = new THREE.MeshPhysicalMaterial({ color: 0xc8232c, roughness: 0.62, clearcoat: 0.25 });
@@ -93,6 +93,21 @@ function buildPaddle(): THREE.Group {
   return g;
 }
 
+/** The paddle blade's centre in hand coordinates: where the ball is met. */
+export const PADDLE_CENTER = new THREE.Vector3(0, -0.032, -0.137);
+
+/** Bends the model's fingers to the given curls (thumb..little, 0..1). */
+export function applyCurl(h: HandModel, curl: number[]): void {
+  for (let i = 0; i < 4; i++) { const a = fingerAngles(i + 1, curl[i + 1]), j = h.fingers[i]; j[0].rotation.x = -a[0] * D2R; j[1].rotation.x = -a[1] * D2R; j[2].rotation.x = -a[2] * D2R; }
+  const a = fingerAngles(0, curl[0]), t = JOINT.thumb;
+  h.thumbRoot.rotation.y = -a[0] * D2R;
+  h.thumbRoot.rotation.x = -(t.pitch[0] + (t.pitch[1] - t.pitch[0]) * curl[0]) * D2R;
+  h.thumb[1].rotation.x = -a[1] * D2R; h.thumb[2].rotation.x = -a[2] * D2R;
+}
+
+/** The glove's quaternion (w,x,y,z; sensor world X forward, Y left, Z up) as a three.js quaternion (vector part x,y,z -> -y,z,-x). */
+export function sensorToThree(q: number[], out = new THREE.Quaternion()): THREE.Quaternion { return out.set(-q[2], q[3], -q[1], q[0]); }
+
 /** Joint angles in degrees: fingers [mcp, pip, dip]; thumb [cmc yaw, mcp, ip]. One sensor per finger, fixed coupling. */
 export function fingerAngles(finger: number, c: number): number[] {
   if (finger === 0) { const t = JOINT.thumb; return [t.yaw[0] + (t.yaw[1] - t.yaw[0]) * c, t.mcp * c, t.ip * c]; }
@@ -101,10 +116,10 @@ export function fingerAngles(finger: number, c: number): number[] {
 }
 
 const TRAIL = 36;
-const GRIP = [0.42, 0.55, 0.72, 0.8, 0.82];
+export const GRIP = [0.42, 0.55, 0.72, 0.8, 0.82];
 export type ViewName = 'back' | 'palm' | 'side';
 const VIEWS: Record<ViewName, [number, number, number]> = { back: [0.1, 0.3, 0.34], palm: [0.1, -0.3, 0.34], side: [0.42, 0.04, 0.02] };
-const PLAY_VIEWS: Record<ViewName, [number, number, number]> = { back: [0.27, 0.27, 0.33], palm: [0.27, -0.22, 0.33], side: [0.47, 0.05, 0.05] }; // oblique, so the paddle face shows
+const PLAY_VIEWS: Record<ViewName, [number, number, number]> = { back: [0.36, 0.3, 0.44], palm: [0.36, -0.24, 0.44], side: [0.62, 0.06, 0.06] }; // oblique, so the paddle face shows
 
 export class HandView {
   readonly el: HTMLElement;
@@ -120,6 +135,7 @@ export class HandView {
   private pressure = 0;
   private tPressure = 0;
   private snapNext = true;
+  private gotPose = false;
   private paddle = buildPaddle();
   private play = false;
   private floor!: THREE.Mesh;
@@ -178,7 +194,7 @@ export class HandView {
   private viewName: ViewName = 'back';
   setView(v: ViewName): void {
     this.viewName = v; const p = (this.play ? PLAY_VIEWS : VIEWS)[v];
-    this.camera.position.set(p[0], p[1], p[2]); this.controls.target.set(0, this.play ? -0.04 : 0, this.play ? -0.07 : -0.02); this.controls.maxDistance = this.play ? 1.4 : 1.2; this.controls.update();
+    this.camera.position.set(p[0], p[1], p[2]); this.controls.target.set(0, this.play ? 0.03 : 0, this.play ? -0.06 : -0.02); this.controls.maxDistance = this.play ? 1.4 : 1.2; this.controls.update();
   }
   private placeStage(): void {
     const y = this.play ? -0.2 : -0.1;
@@ -196,6 +212,7 @@ export class HandView {
   /** q: the glove's hand quaternion (w,x,y,z; world X forward, Y left, Z up). snap skips smoothing (used for replay). */
   setPose(q: number[], curl: number[], pressurePct: number, snap = false): void {
     const [w, x, y, z] = q; // sensor world frame to three.js: vector part (x,y,z) -> (-y,z,-x)
+    this.gotPose = true;
     this.target.set(-y, z, -x, w);
     if (this.cur.dot(this.target) < 0) this.target.set(-this.target.x, -this.target.y, -this.target.z, -this.target.w);
     this.tCurl = curl.slice(0, 5);
@@ -206,16 +223,15 @@ export class HandView {
   private frame(now: number): void {
     const dt = Math.min(0.1, (now - this.last) / 1000); this.last = now;
     const k = 1 - Math.exp(-dt / 0.03);
-    this.cur.slerp(this.target, k);
+    if (this.play && !this.gotPose) { // no glove data yet: hold the paddle up and sway a little, instead of lying flat at the sensor's zero pose
+      this.target.setFromEuler(new THREE.Euler((72 + 5 * Math.sin(now / 1100)) * D2R, 12 * D2R * Math.sin(now / 1700), 0));
+    }
+    this.cur.slerp(this.target, this.gotPose ? k : 1 - Math.exp(-dt / 0.15));
     this.hand.root.quaternion.copy(this.cur);
     const want = this.play ? GRIP : this.tCurl; // with the paddle in hand the fingers hold it; the flex sensors are too coarse to animate a grip
     for (let i = 0; i < 5; i++) this.curl[i] += (want[i] - this.curl[i]) * k;
     this.pressure += (this.tPressure - this.pressure) * k;
-    for (let i = 0; i < 4; i++) { const a = fingerAngles(i + 1, this.curl[i + 1]), j = this.hand.fingers[i]; j[0].rotation.x = -a[0] * D2R; j[1].rotation.x = -a[1] * D2R; j[2].rotation.x = -a[2] * D2R; }
-    const a = fingerAngles(0, this.curl[0]), t = JOINT.thumb;
-    this.hand.thumbRoot.rotation.y = -a[0] * D2R;
-    this.hand.thumbRoot.rotation.x = -(t.pitch[0] + (t.pitch[1] - t.pitch[0]) * this.curl[0]) * D2R;
-    this.hand.thumb[1].rotation.x = -a[1] * D2R; this.hand.thumb[2].rotation.x = -a[2] * D2R;
+    applyCurl(this.hand, this.curl);
     const p = this.pressure;
     (this.hand.press.material as THREE.MeshBasicMaterial).color.setRGB(0.29 + 0.71 * p, 0.32 + 0.1 * p - 0.12 * p * p, 0.36 - 0.22 * p);
     this.accent.lerp(this.accentTarget, 1 - Math.exp(-dt / 0.12));

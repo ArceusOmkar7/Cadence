@@ -43,6 +43,25 @@ laptop, so use the IP (it is printed on the glove's serial output at boot, as `3
 `npm test` runs the unit tests; `npm run build && node server/e2e.mjs` drives the real page in headless Edge/Chrome
 (17 checks: connect, calibration gate, a stroke set, an idle set, review, replay, dashboard, export).
 
+## Game (third tab)
+
+A 3D table-tennis rally against a robot, first to 7 points, four opponents (Rookie to Champion). Open it with the **Game** tab, hold the
+paddle up facing the opponent and **swing any stroke to start** (keyboard fallback: Space). The arena is a Blender model
+(`public/models/arena.glb`, built through the Blender MCP; a plain stand-in is used if it cannot load).
+
+- The incoming ball is marked on the table with the stroke to play (FH, BH, SM, PU). Swing as it reaches your paddle: the ball waits at the
+  paddle (a "hit-stop") until the glove's classifier has read the swing, about 0.2 s (Fast) after the peak.
+- The right stroke, on time, scores most and sends back a clean ball; a wrong or unreadable stroke still returns, but weaker, and the
+  opponent punishes it. Swing intensity sets the ball speed. Placement is random (the glove's heading is not reliable, so it is not used).
+- The hand and paddle on screen follow the glove's orientation, relative to the pose you were in at Start (press **C** to recentre).
+- No glove (testing only): keys 1 to 4 play Forehand, Backhand, Smash, Push; M mutes.
+- Physics (`src/game/physics.ts`): gravity, air drag, Magnus force from spin, a table bounce that depends on spin, the net. Rules and
+  scoring: `src/game/engine.ts`. Shot generation: `src/game/shots.ts` (every ball is checked against the physics, so it is playable).
+- `npm test` covers physics, shots and whole simulated matches. `test/gameDataset.test.ts` replays the recorded strokes in `dataset/`
+  through the live classifier and plays simulated matches with them (writes `test/out/game-sim.txt`). Caveats: the shipped models were trained
+  on those recordings, so that player sees in-sample answers; a "held-out-like" player uses the measured leave-one-set-out recall instead;
+  human timing in the simulation is an assumption. It checks balance, not feel. `node server/e2e-game.mjs` drives the real page.
+
 ## How the pieces fit
 
 ```

@@ -16,7 +16,7 @@ import { WebSocket, WebSocketServer } from 'ws';
 const PORT = Number(process.env.PORT || 8787);
 const HOST = process.env.HOST || '127.0.0.1'; // set HOST=0.0.0.0 to let a phone on the same WiFi open the app (anyone on the WiFi can then use the relay)
 const DIST = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist');
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.map': 'application/json' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.glb': 'model/gltf-binary', '.png': 'image/png', '.map': 'application/json' };
 
 let gloveHost = process.env.GLOVE_HOST || '';
 let gloveWs = null;
