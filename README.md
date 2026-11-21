@@ -1,7 +1,22 @@
 # Glove
 
-ESP8266 sensor glove: five flex sensors, a palm pressure sensor and a back-of-hand MPU (WHO_AM_I 0x70: an MPU6500), streamed to a 3D viewer
-and (in progress) a data recorder for stroke classification.
+An ESP8266 sensor glove streams five flex sensors, a palm pressure sensor, and a back-of-hand MPU6500 to a 3D viewer. The recorder web app collects table tennis strokes, classifies them live, and uses them to control a 3D table tennis game.
+
+## Screenshots
+
+These screenshots were captured with the recorder's simulated glove.
+
+### Recording a forehand set
+
+![Recorder showing forehand repetitions and a 3D glove preview](docs/screenshots/recording.png)
+
+### Live stroke classification
+
+![Live classifier showing a push prediction, its confidence, and recent strokes](docs/screenshots/live-classification.png)
+
+### 3D table tennis game
+
+![Table tennis rally showing a backhand timing cue and the current score](docs/screenshots/table-tennis-game.png)
 
 ## Setup
 1. Copy `include/secrets.example.h` to `include/secrets.h` and put your WiFi in it (git-ignored).
@@ -14,9 +29,9 @@ and (in progress) a data recorder for stroke classification.
 - `test/host/` math tests: `g++ -std=c++17 -I lib/GloveMath test/host/test_glovemath.cpp -o t && ./t`.
 
 ## Backups
-Git only holds code. Recorded sessions (`recordings/`) and `include/secrets.h` are git-ignored on purpose, so back
-them up separately: copy `recordings/` to a second drive or cloud folder after every session (for example
-`robocopy recordings D:\glove-backup\recordings /E` on Windows). Calibration lives on the glove itself and is
+Recorded sessions (`recordings/`, `dataset/`) and `include/secrets.h` are git-ignored, so back
+them up separately. For example, copy `recordings/` to a second drive or cloud folder after every session with
+`robocopy recordings D:\glove-backup\recordings /E` on Windows. Calibration lives on the glove itself and is
 also saved into every session folder.
 
 ## Record stream (Stage 1)

@@ -10,6 +10,7 @@ include/viewer_page.h
 # recorded sessions and datasets (back these up separately, see README)
 recordings/
 sessions/
+/dataset/
 # archives, python and node artefacts
 *.zip
 __pycache__/
