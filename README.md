@@ -1,6 +1,6 @@
-# SmartGlove
+# Cadence
 
-SmartGlove is a wearable IoT prototype for table tennis. An ESP8266 reads hand motion, finger bend, and palm pressure, then streams the readings over local Wi-Fi. The browser app records practice sets and uses an XGBoost model to recognize strokes live. You can also use those strokes to play a 3D rally against a robot.
+Cadence is a wearable IoT prototype for table tennis. An ESP8266 reads hand motion, finger bend, and palm pressure, then streams the readings over local Wi-Fi. The browser app records practice sets and uses an XGBoost model to recognize strokes live. You can also use those strokes to play a 3D rally against a robot.
 
 ## Hardware and wiring
 
